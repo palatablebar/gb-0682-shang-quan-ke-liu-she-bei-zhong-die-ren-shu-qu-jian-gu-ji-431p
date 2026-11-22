@@ -2,7 +2,7 @@ import importlib,os
 from flask import Flask,jsonify,request,redirect,Response
 from app.config import MODULES
 from app.errors import DomainError
-from app.workflow import run,load
+from app.workflow import run,load,supplement
 from app import store
 from app.web import payload
 from app.modules.m7_archive.export_out import bundle
@@ -30,10 +30,20 @@ def create_app():
         data=request.get_json(silent=True) or {}
         if not isinstance(data.get('version'),int):raise DomainError('VERSION','请提交复核版本')
         return jsonify(store.review(run_id,data['version'],data.get('decision')))
+    @app.post('/api/runs/<run_id>/supplement')
+    def supplement_run(run_id):
+        data=request.get_json(silent=True) or {}
+        patch=data.get('csv')
+        if not isinstance(patch,str) or not patch.strip():raise DomainError('PAYLOAD','补录必须提交CSV文本')
+        base=store.get(run_id)
+        # 补录失败（RECOMPUTE/HEADER等）在落库前抛出，旧批次原样保留、记录不丢失
+        new_state=supplement(base,patch.encode('utf-8'))
+        return jsonify(store.replace_latest(new_state))
     @app.get('/api/archive/<run_id>/export.csv')
     def download(run_id):
         state=store.get(run_id)
-        if not state.get('reconcile',{}).get('balanced'):raise DomainError('UNBALANCED','对账未平')
+        rec=state.get('reconcile',{})
+        if not rec.get('balanced') or rec.get('pending'):raise DomainError('UNBALANCED','对账未平或待核对，不能封存')
         return Response(bundle(state),mimetype='text/csv; charset=utf-8',headers={'Content-Disposition':'attachment; filename=evidence.csv'})
     with app.app_context():
         if not store.history():

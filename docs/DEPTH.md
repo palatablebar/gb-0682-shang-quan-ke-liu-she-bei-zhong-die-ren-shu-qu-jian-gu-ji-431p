@@ -31,10 +31,14 @@
 | TRAP-26 | 旧版本复核 | 覆盖新结论 | 事务条件更新 | `app/store.py` | `tests/test_archive.py::test_stale_review` |
 | TRAP-11 | 时区混用 | 同刻不同桶 | UTC归整 | `app/modules/m2_mapping/coerce.py` | `tests/test_versions.py::test_same_instant` |
 | TRAP-19 | 三方约束矛盾 | 输出伪精确数 | 非负原子区域可行检查 | `app/modules/m5_calculate/rules.py` | `tests/test_calculate.py::test_three_way_contradiction` |
+| TRAP-27 | 闸机总量越界 | 用单点总量改写区间（假精确） | 总量仅对证，越界转待核对 | `app/modules/m6_reconcile/compare.py` | `tests/test_reconcile.py::test_gate_outside_interval_pending_not_forced` |
+| TRAP-28 | 补录越界重排 | 补一行全天重算 | 仅受影响UTC小时可变，否则RECOMPUTE | `app/workflow.py` | `tests/test_supplement.py::test_supplement_rejects_change_outside_affected_hours` |
+| TRAP-29 | 同批重产生版本 | 重跑新增对账版本 | 幂等键复用既有行与版本 | `app/store.py` | `tests/test_supplement.py::test_same_rerun_never_creates_version` |
+| TRAP-30 | 切换失败丢记录 | 覆盖式切换丢失旧证据 | 事务内先校验守恒再切指针 | `app/store.py` | `tests/test_supplement.py::test_supplement_failure_keeps_old_batch` |
 
 ## 对账规则
 
-输入行数=采纳+隔离+空行+重复表头+完全重复；业务总数与计算证据独立求和。隔离行保留来源行、ID、原因码与原值。
+输入行数=采纳+隔离+空行+重复表头+完全重复；业务总数与计算证据独立求和。隔离行保留来源行、ID、原因码与原值。闸机日结总量是佐证不是约束：区间内标记佐证一致，越出区间转待核对（pending），封存与复核通过均被拦截，M6页面与M7封存采用同一判断。
 
 ## 已知不覆盖
 
